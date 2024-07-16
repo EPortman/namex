@@ -34,6 +34,7 @@ nro = NROServices()
 from namex import models
 from namex.models import db, ma
 from namex.resources import api
+from namex.utils.email_throttler import EmailThrottler
 from namex.utils.run_version import get_run_version
 
 # noqa: I003; dont know what flake8 wants here
@@ -69,6 +70,8 @@ def create_app(run_mode=os.getenv('FLASK_ENV', 'production')):
     cache.init_app(app)
     nr_filing_actions.init_app(app)
 
+    setup_email_throttler(app)
+
     @app.after_request
     def add_version(response):
         os.getenv('OPENSHIFT_BUILD_COMMIT', '')
@@ -89,6 +92,11 @@ def setup_jwt_manager(app, jwt):
     jwt.init_app(app)
 
     return
+
+
+def setup_email_throttler(app):
+    """Initialize the Email Throttler."""
+    app.email_throttler_context = EmailThrottler(app)
 
 
 def register_shellcontext(app):
