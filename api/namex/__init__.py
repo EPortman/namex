@@ -44,7 +44,7 @@ run_version = get_run_version()
 
 def create_app(run_mode=os.getenv('FLASK_ENV', 'production')):
     """Create app."""
-    app = Flask(__name__)
+    app = Flask(__name__)  # THIS IS A FLASK APP
     CORS(app)
     app.config.from_object(config.CONFIGURATION[run_mode])
 

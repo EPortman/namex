@@ -42,7 +42,7 @@ def throttle_email_notification(nr_num: str, decision: str):
     email_throttler: EmailThrottler = current_app.email_throttler_context
     email_callback = lambda: publish_email_notification(nr_num, decision)
 
-    if email_throttler.initialized and email_throttler.email_thread_status.is_set():
+    if email_throttler.email_thread_status.is_set():
         current_app.logger.debug('Throttling email for %s with decision %s', nr_num, decision)
         email_throttler.schedule_or_update_email_task(nr_num, email_callback)
     else:
