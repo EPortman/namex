@@ -27,10 +27,8 @@ class EmailThrottler:
             self.email_tasks: dict[str, asyncio.Task] = {}
             self.email_callbacks: dict[str, Callable] = {}
 
-            self.initialized = True
         except Exception as e:
             self.app.logger.error(f'Failed to Initialize Email Throttler, {e}')
-            self.initialized = False
 
 
     def start_event_loop(self):
@@ -45,14 +43,10 @@ class EmailThrottler:
         except Exception as e:
             self.app.logger.error(f'Exception in Email Throttler Loop: {e}')
         finally:
-            print("HERE")
             self.email_thread_ready_to_close.wait()
-            print("THERE")
             self.email_thread_status.clear()
-            self.app.logger.debug('Emailer Thread has been shutdown.')
             self.email_thread_loop.close()
-            self.app.logger.debug('Closed the loop.')
-            self.email_thread.join()
+            self.email_thread_finished.set()
 
 
     def schedule_or_update_email_task(self, nr_num: str, email: Callable):
@@ -71,12 +65,11 @@ class EmailThrottler:
                         {nr_num: asyncio.create_task(self.send_email_after_delay(nr_num))}
                     )
                 )
-                raise Exception
+
         except Exception as e:
             self.app.logger.error(f'Exception when throttling the email: {e}')
             future = asyncio.run_coroutine_threadsafe(self.flush_and_stop_emailer_thread(), self.email_thread_loop)
             future.result()
-            print("SETTING TO READY TO CLOSE")
             self.email_thread_ready_to_close.set()
 
 
