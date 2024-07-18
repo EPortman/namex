@@ -26,7 +26,6 @@ class EmailThrottler:
 
             self.email_tasks: dict[str, asyncio.Task] = {}
             self.email_callbacks: dict[str, Callable] = {}
-
         except Exception as e:
             self.app.logger.error(f'Failed to Initialize Email Throttler, {e}')
             self.email_thread_status.clear()
@@ -52,7 +51,7 @@ class EmailThrottler:
         Schedules a new email task on the emailer thread or updates an existing task's email callback.
         Once the task completes only the most recent email for the NR will be sent.
 
-        If an error is encountered all of the pending emails are sent and the emailer thread is closed.
+        If an error occurs when scheduling the task the email is sent immediately instead.
         """
         with self.threading_lock:
             self.email_callbacks[nr_num] = email
@@ -74,11 +73,11 @@ class EmailThrottler:
     async def send_email_after_delay(self, nr_num: str):
         """
         Waits for a specified delay, then triggers the callback email for the given NR.
-        Scheduled on the Emailer Thread Event Loop.
+        If the email fails to send it will stay in the persistent storage.
         """
         await asyncio.sleep(self.throttle_time)
 
-        with self.app.app_context():
+        with self.app.app_context(), self.threading_lock:
             try:
                 self.email_callbacks[nr_num]()
                 PendingEmail.delete_record(nr_num)
