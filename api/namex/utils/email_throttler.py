@@ -1,13 +1,12 @@
 import threading
 import asyncio
 from typing import Callable
-from namex.models import PendingEmail
 
 class EmailThrottler:
     """
     Manages the throttling of sending emails by using a dedicated emailer thread. The emailer thread 
-    manages an event loop where email tasks are scheduled and awaited for each NR. Once a task completes
-    on the emailer thread, the task makes a call to send the most recent email stored for the NR. 
+    manages an event loop where email tasks are scheduled and awaited asynchronously for each NR. 
+    Once a task completes on the emailer thread, the task sends the most recent email stored for the NR. 
 
     All emails stored by this class are written to and deleted from the db as they are used to have 
     peristent storage of pending emails.
@@ -48,17 +47,20 @@ class EmailThrottler:
 
     def schedule_or_update_email_task(self, nr_num: str, decision: str, email: Callable):
         """
-        Schedules a new email task on the emailer thread or updates an existing task's email callback.
+        Schedules a new email task on the emailer thread or updates an existing one.
         Once the task completes only the most recent email for the NR will be sent.
-
-        If an error occurs when scheduling the task the email is sent immediately instead.
+    
+        If an error occurs when scheduling the task the email is sent immediately.
         """
+        from namex.models import PendingEmail
+
         with self.threading_lock:
             self.email_callbacks[nr_num] = email
             PendingEmail.add_or_update_email(nr_num, decision)
 
             try:
                 if nr_num not in self.email_tasks.keys():
+                    # The callback creates / registers an async task in the email_tasks dictionary
                     self.email_thread_loop.call_soon_threadsafe(
                         lambda: self.email_tasks.update(
                             {nr_num: asyncio.create_task(self.send_email_after_delay(nr_num))}
@@ -67,14 +69,18 @@ class EmailThrottler:
             except Exception as e:
                 self.app.logger.error(f'Exception when throttling the email: {e}')
                 email()
+                self.email_tasks.pop(nr_num, None)
+                self.email_callbacks.pop(nr_num, None)
                 PendingEmail.delete_record(nr_num)
 
 
     async def send_email_after_delay(self, nr_num: str):
         """
-        Waits for a specified delay, then triggers the callback email for the given NR.
-        If the email fails to send it will stay in the persistent storage.
+        Waits for a specified delay, then calls the callback email for the given NR 
+        on the emailer thread. If the email fails to send it will stay in persistent storage.
         """
+        from namex.models import PendingEmail
+
         await asyncio.sleep(self.throttle_time)
 
         with self.app.app_context(), self.threading_lock:
