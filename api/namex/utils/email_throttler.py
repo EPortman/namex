@@ -9,8 +9,8 @@ class EmailThrottler:
     manages an event loop where email tasks are scheduled and awaited for each NR. Once a task completes
     on the emailer thread, the task makes a call to send the most recent email stored for the NR. 
 
-    All emails stored by this class are written to and deleted from disk as they are used to prevent
-    losing emails if the server shuts down unexpectedly. 
+    All emails stored by this class are written to and deleted from the db as they are used to have 
+    peristent storage of pending emails.
     """
 
     def __init__(self, app):
@@ -54,21 +54,21 @@ class EmailThrottler:
 
         If an error is encountered all of the pending emails are sent and the emailer thread is closed.
         """
-        # Update Email in Memory and in db
-        self.email_callbacks[nr_num] = email
-        PendingEmail.add_or_update_email(nr_num, decision)
+        with self.threading_lock:
+            self.email_callbacks[nr_num] = email
+            PendingEmail.add_or_update_email(nr_num, decision)
 
-        try:
-
-            if nr_num not in self.email_tasks.keys():
-                self.email_thread_loop.call_soon_threadsafe(
-                    lambda: self.email_tasks.update(
-                        {nr_num: asyncio.create_task(self.send_email_after_delay(nr_num))}
+            try:
+                if nr_num not in self.email_tasks.keys():
+                    self.email_thread_loop.call_soon_threadsafe(
+                        lambda: self.email_tasks.update(
+                            {nr_num: asyncio.create_task(self.send_email_after_delay(nr_num))}
+                        )
                     )
-                )
-        except Exception as e:
-            self.app.logger.error(f'Exception when throttling the email: {e}')
-            email()
+            except Exception as e:
+                self.app.logger.error(f'Exception when throttling the email: {e}')
+                email()
+                PendingEmail.delete_record(nr_num)
 
 
     async def send_email_after_delay(self, nr_num: str):
@@ -87,5 +87,3 @@ class EmailThrottler:
             finally:
                 self.email_tasks.pop(nr_num, None)
                 self.email_callbacks.pop(nr_num, None)
-
-
