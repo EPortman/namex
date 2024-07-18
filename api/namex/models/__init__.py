@@ -26,4 +26,5 @@ from .word_classification import WordClassification, WordClassificationSchema
 from .virtual_word_condition import VirtualWordCondition
 from .nr_number import NRNumber
 from .payment import Payment
+from .pending_email import PendingEmail
 from .hotjar_tracking import HotjarTracking
