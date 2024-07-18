@@ -688,7 +688,7 @@ class Request(Resource):
             return make_response(jsonify(message='Request:{} - patched'.format(nr), warnings=warnings), 206)
 
         if state in [State.APPROVED, State.CONDITIONAL, State.REJECTED]:
-            queue_util.publish_email_notification(nrd.nrNum, state)
+            queue_util.throttle_email_notification(nrd.nrNum, state)
 
         return make_response(jsonify(message='Request:{} - patched'.format(nr)), 200)
 

@@ -2,8 +2,7 @@ from . import db
 
 class PendingEmail(db.Model):
     __tablename__ = 'pending_email'
-    id = db.Column(db.Integer, primary_key=True)
-    nr_num = db.Column('nr_num', db.String(10), unique=True)
+    nr_num = db.Column('nr_num', db.String(10), primary_key=True)
     decision = db.Column('decision', db.String(30))
 
     @classmethod
