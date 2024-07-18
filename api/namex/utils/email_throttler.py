@@ -6,15 +6,14 @@ class EmailThrottler:
     """
     Manages the throttling of sending emails by using a dedicated emailer thread. The emailer thread 
     manages an event loop where email tasks are scheduled and awaited asynchronously for each NR. 
-    Once a task completes on the emailer thread, the task sends the most recent email stored for the NR. 
+    Once a task completes on the emailer thread, it sends the most recent email stored for the NR. 
 
-    All emails stored by this class are written to and deleted from the db as they are used to have 
-    peristent storage of pending emails.
+    All emails stored by this class are written to and deleted from the db.
     """
 
     def __init__(self, app):
         self.app = app
-        self.throttle_time = 10
+        self.throttle_time = 300
         self.email_thread_status = threading.Event()
         try:
             self.email_thread = threading.Thread(target=self.start_event_loop, daemon=True)
@@ -60,7 +59,7 @@ class EmailThrottler:
 
             try:
                 if nr_num not in self.email_tasks.keys():
-                    # The callback creates / registers an async task in the email_tasks dictionary
+                    # The callback creates & registers an async task in the email_tasks dictionary
                     self.email_thread_loop.call_soon_threadsafe(
                         lambda: self.email_tasks.update(
                             {nr_num: asyncio.create_task(self.send_email_after_delay(nr_num))}

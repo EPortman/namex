@@ -17,13 +17,14 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table('hotjar_tracking',
-    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('nr_id', sa.Integer(), nullable=True),
-    sa.Column('hotjar_user', sa.VARCHAR(length=20), nullable=True),
-    sa.Column('last_update_dt', sa.DateTime(timezone=True), nullable=True),
-    sa.PrimaryKeyConstraint('id')
-    )
+    print("HI")
+    # op.create_table('hotjar_tracking',
+    # sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    # sa.Column('nr_id', sa.Integer(), nullable=True),
+    # sa.Column('hotjar_user', sa.VARCHAR(length=20), nullable=True),
+    # sa.Column('last_update_dt', sa.DateTime(timezone=True), nullable=True),
+    # sa.PrimaryKeyConstraint('id')
+    # )
     # ### end Alembic commands ###
 
 

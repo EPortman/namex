@@ -17,8 +17,9 @@ depends_on = None
 
 
 def upgrade():
-    op.create_index(op.f('ix_user_idp_userid'), 'users', ['idp_userid'], unique=True)
-    op.create_unique_constraint('users_idp_userid_key', 'users', ['idp_userid'])
+    print("HIT")
+    # op.create_index(op.f('ix_user_idp_userid'), 'users', ['idp_userid'], unique=True)
+    # op.create_unique_constraint('users_idp_userid_key', 'users', ['idp_userid'])
 
 
 def downgrade():
