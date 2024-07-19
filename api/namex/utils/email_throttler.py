@@ -18,7 +18,6 @@ class EmailThrottler:
         try:
             self.email_thread = threading.Thread(target=self._start_event_loop, daemon=True)
             self.email_thread_loop = asyncio.new_event_loop()
-            self.threading_lock = threading.Lock()
             self.email_thread.start()
             self.email_thread_status.set()
 
@@ -38,24 +37,23 @@ class EmailThrottler:
         """
         from namex.models import PendingEmail
 
-        with self.threading_lock:
-            self.email_callbacks[nr_num] = email
-            PendingEmail.add_or_update_email(nr_num, decision)
+        self.email_callbacks[nr_num] = email
+        PendingEmail.add_or_update_email(nr_num, decision)
 
-            try:
-                if nr_num not in self.email_tasks.keys():
-                    # The callback creates & registers an async task in the email_tasks dictionary
-                    self.email_thread_loop.call_soon_threadsafe(
-                        lambda: self.email_tasks.update(
-                            {nr_num: asyncio.create_task(self._send_email_after_delay(nr_num))}
-                        )
+        try:
+            if nr_num not in self.email_tasks.keys():
+                # The callback creates & registers an async task in the email_tasks dictionary
+                self.email_thread_loop.call_soon_threadsafe(
+                    lambda: self.email_tasks.update(
+                        {nr_num: asyncio.create_task(self._send_email_after_delay(nr_num))}
                     )
-            except Exception as e:
-                self.app.logger.error(f'Exception when throttling the email: {e}')
-                email()
-                self.email_tasks.pop(nr_num, None)
-                self.email_callbacks.pop(nr_num, None)
-                PendingEmail.delete_record(nr_num)
+                )
+        except Exception as e:
+            self.app.logger.error(f'Exception when throttling the email: {e}')
+            email()
+            self.email_tasks.pop(nr_num, None)
+            self.email_callbacks.pop(nr_num, None)
+            PendingEmail.delete_record(nr_num)
 
 
     def _start_event_loop(self):
@@ -82,7 +80,7 @@ class EmailThrottler:
 
         await asyncio.sleep(self.throttle_time)
 
-        with self.app.app_context(), self.threading_lock:
+        with self.app.app_context():
             try:
                 self.email_callbacks[nr_num]()
                 PendingEmail.delete_record(nr_num)

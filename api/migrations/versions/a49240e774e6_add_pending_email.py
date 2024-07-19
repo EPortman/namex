@@ -16,7 +16,6 @@ depends_on = None
 
 def upgrade():
     op.create_table('pending_email',
-    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('nr_num', sa.String(length=30), nullable=False),
     sa.Column('decision', sa.String(length=30), nullable=False),
     )
