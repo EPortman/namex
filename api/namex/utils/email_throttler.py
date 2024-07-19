@@ -14,8 +14,9 @@ class EmailThrottler:
         self.app = app
         self.throttle_time = 300
         self.email_thread_status = threading.Event()
+        self._send_pending_emails_on_startup()
         try:
-            self.email_thread = threading.Thread(target=self.start_event_loop, daemon=True)
+            self.email_thread = threading.Thread(target=self._start_event_loop, daemon=True)
             self.email_thread_loop = asyncio.new_event_loop()
             self.threading_lock = threading.Lock()
             self.email_thread.start()
@@ -25,21 +26,6 @@ class EmailThrottler:
             self.email_callbacks: dict[str, Callable] = {}
         except Exception as e:
             self.app.logger.error(f'Failed to Initialize Email Throttler, {e}')
-            self.email_thread_status.clear()
-
-
-    def start_event_loop(self):
-        """
-        Starts the event loop that runs indefinetly on the emailer thread. Email tasks from the
-        main thread are scheduled using this loop. 
-        """
-        try:
-            asyncio.set_event_loop(self.email_thread_loop)
-            self.email_thread_loop.run_forever()
-        except Exception as e:
-            self.app.logger.error(f'Exception in Email Throttler Loop: {e}')
-        finally:
-            self.app.logger.debug('Uh oh, Email Throttler Loop has stopped unexpectedly.')
             self.email_thread_status.clear()
 
 
@@ -61,7 +47,7 @@ class EmailThrottler:
                     # The callback creates & registers an async task in the email_tasks dictionary
                     self.email_thread_loop.call_soon_threadsafe(
                         lambda: self.email_tasks.update(
-                            {nr_num: asyncio.create_task(self.send_email_after_delay(nr_num))}
+                            {nr_num: asyncio.create_task(self._send_email_after_delay(nr_num))}
                         )
                     )
             except Exception as e:
@@ -72,7 +58,22 @@ class EmailThrottler:
                 PendingEmail.delete_record(nr_num)
 
 
-    async def send_email_after_delay(self, nr_num: str):
+    def _start_event_loop(self):
+        """
+        Starts the event loop that runs indefinetly on the emailer thread. Email tasks from the
+        main thread are scheduled using this loop. 
+        """
+        try:
+            asyncio.set_event_loop(self.email_thread_loop)
+            self.email_thread_loop.run_forever()
+        except Exception as e:
+            self.app.logger.error(f'Exception in Email Throttler Loop: {e}')
+        finally:
+            self.app.logger.debug('Uh oh, Email Throttler Loop has stopped unexpectedly.')
+            self.email_thread_status.clear()
+
+
+    async def _send_email_after_delay(self, nr_num: str):
         """
         Waits for a specified delay, then calls the callback email for the given NR 
         on the emailer thread. If the email fails to send it will stay in persistent storage.
@@ -90,3 +91,14 @@ class EmailThrottler:
             finally:
                 self.email_tasks.pop(nr_num, None)
                 self.email_callbacks.pop(nr_num, None)
+
+
+    def _send_pending_emails_on_startup(self):
+        from namex.models import PendingEmail
+        from namex.utils import queue_util
+
+        with self.app.app_context():
+            emails = PendingEmail.query.all()
+            for email in emails:
+                decision = email.decision
+                queue_util.publish_email_notification(email.nr_num, decision)
