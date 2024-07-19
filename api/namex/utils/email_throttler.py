@@ -26,6 +26,21 @@ class EmailThrottler:
         except Exception as e:
             self.app.logger.error(f'Failed to Initialize Email Throttler, {e}')
             self.email_thread_status.clear()
+    
+
+    def _start_event_loop(self):
+        """
+        Starts the event loop that runs indefinetly on the emailer thread. Email tasks from the
+        main thread are scheduled using this loop. 
+        """
+        try:
+            asyncio.set_event_loop(self.email_thread_loop)
+            self.email_thread_loop.run_forever()
+        except Exception as e:
+            self.app.logger.error(f'Exception in Email Throttler Loop: {e}')
+        finally:
+            self.app.logger.debug('Uh oh, Email Throttler Loop has stopped unexpectedly.')
+            self.email_thread_status.clear()
 
 
     def schedule_or_update_email_task(self, nr_num: str, decision: str, email: Callable):
@@ -54,21 +69,6 @@ class EmailThrottler:
             self.email_tasks.pop(nr_num, None)
             self.email_callbacks.pop(nr_num, None)
             PendingEmail.delete_record(nr_num)
-
-
-    def _start_event_loop(self):
-        """
-        Starts the event loop that runs indefinetly on the emailer thread. Email tasks from the
-        main thread are scheduled using this loop. 
-        """
-        try:
-            asyncio.set_event_loop(self.email_thread_loop)
-            self.email_thread_loop.run_forever()
-        except Exception as e:
-            self.app.logger.error(f'Exception in Email Throttler Loop: {e}')
-        finally:
-            self.app.logger.debug('Uh oh, Email Throttler Loop has stopped unexpectedly.')
-            self.email_thread_status.clear()
 
 
     async def _send_email_after_delay(self, nr_num: str):
