@@ -7,6 +7,7 @@ from simple_cloudevent import SimpleCloudEvent
 from sbc_common_components.utils.enums import QueueMessageTypes
 
 from namex.services import queue
+from namex.models import State
 from namex.utils.email_throttler import EmailThrottler
 
 
@@ -43,8 +44,12 @@ def throttle_email_notification(nr_num: str, decision: str):
     email_callback = lambda: publish_email_notification(nr_num, decision)
 
     if email_throttler.email_thread_status.is_set():
-        current_app.logger.debug('Throttling email for %s with decision %s', nr_num, decision)
-        email_throttler.schedule_or_update_email_task(nr_num, decision, email_callback)
+        if decision in [State.APPROVED, State.REJECTED, State.CONDITIONAL]:
+            current_app.logger.debug('Throttling email for %s with decision %s', nr_num, decision)
+            email_throttler.schedule_or_update_email_task(nr_num, decision, email_callback)
+        elif decision in State.HOLD and nr_num in email_throttler.email_callbacks:
+            current_app.logger.debug('Holding Email for %s', nr_num)
+            email_throttler.hold_email_task(nr_num, decision)
     else:
         current_app.logger.debug('Email throttler is not available. Publishing email immediately.')
         email_callback()
