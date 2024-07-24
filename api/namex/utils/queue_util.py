@@ -38,7 +38,7 @@ def publish_email_notification(nr_num: str, option: str, refund_value=None):
     queue.publish(topic=email_topic, payload=payload)
 
 
-def throttle_email_notification(nr_num: str, decision: str):
+def throttle_email_notification(nr_num: str, decision: State):
     """If the throttler is available, throttle sending notification info to the mail queue."""
     email_throttler: EmailThrottler = current_app.email_throttler_context
     email_callback = lambda: publish_email_notification(nr_num, decision)
@@ -49,7 +49,7 @@ def throttle_email_notification(nr_num: str, decision: str):
             email_throttler.schedule_or_update_email_task(nr_num, decision, email_callback)
         elif decision in State.HOLD and nr_num in email_throttler.email_callbacks:
             current_app.logger.debug('Holding Email for %s', nr_num)
-            email_throttler.hold_email_task(nr_num, decision)
+            email_throttler.hold_email_task(nr_num)
     else:
         current_app.logger.debug('Email throttler is not available. Publishing email immediately.')
         email_callback()

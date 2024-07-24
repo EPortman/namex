@@ -19,11 +19,10 @@ class EmailThrottler:
             self.email_thread = threading.Thread(target=self._start_event_loop, daemon=True)
             self.email_thread_loop = asyncio.new_event_loop()
             self.email_thread.start()
+            self.email_thread_status.set()
 
             self.email_tasks: dict[str, asyncio.Task] = {}
             self.email_callbacks: dict[str, Callable | None] = {}
-
-            self.email_thread_status.set()
         except Exception as e:
             self.app.logger.error(f'Failed to Initialize Email Throttler, {e}')
             self.email_thread_status.clear()
@@ -56,7 +55,6 @@ class EmailThrottler:
         self.email_callbacks[nr_num] = email
         PendingEmail.add_or_update_email(nr_num, decision)
 
-
         try:
             if nr_num not in self.email_tasks.keys():
                 # The callback creates & registers an async task in the email_tasks dictionary
@@ -73,22 +71,22 @@ class EmailThrottler:
             PendingEmail.delete_record(nr_num)
     
 
-    def hold_email_task(self, nr_num: str, decision: str):
+    def hold_email_task(self, nr_num: str):
         """
-        Prevents an email from being sent if it is set to HOLD or INPROGRESS state. The
-        email will still be held in memory / storage. This allows for a name to be approved
-        and then put back on HOLD without sending and email to the client. 
+        Prevents an email from being sent if it is set to HOLD state. The email will 
+        still be held in memory / storage. This allows for a name to be approved
+        and then put back on HOLD without sending an email to the client. 
         """
-        from namex.models import PendingEmail
+        from namex.models import PendingEmail, State
 
         self.email_callbacks[nr_num] = None
-        PendingEmail.add_or_update_email(nr_num, decision)
+        PendingEmail.add_or_update_email(nr_num, State.HOLD)
     
 
     async def _send_email_after_delay(self, nr_num: str):
         """
         Waits for a specified delay, then calls the callback email for the given NR 
-        on the emailer thread. If the email fails to send it will stay in persistent storage.
+        on the emailer thread. If the email fails to send it will stay in the db.
         """
         from namex.models import PendingEmail
 
@@ -96,9 +94,9 @@ class EmailThrottler:
 
         with self.app.app_context():
             try:
-                if self.email_callbacks[nr_num]:
+                if self.email_callbacks[nr_num] and PendingEmail.get_decision(nr_num):
                     self.email_callbacks[nr_num]()
-                PendingEmail.delete_record(nr_num)
+                    PendingEmail.delete_record(nr_num)
             except Exception as e:
                 self.app.logger.error(f'Error handling email for {nr_num}: {e}')
             finally:
@@ -107,6 +105,7 @@ class EmailThrottler:
 
 
     def _send_pending_emails_on_startup(self):
+        """Send all emails when application starts, preventing emails from being lost if server restarts unexpectedly."""
         from namex.models import PendingEmail, State
         from namex.utils import queue_util
 

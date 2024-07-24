@@ -1,4 +1,4 @@
-from . import db
+from . import db, state
 
 class PendingEmail(db.Model):
     __tablename__ = 'pending_email'
@@ -6,32 +6,28 @@ class PendingEmail(db.Model):
     decision = db.Column('decision', db.String(30))
 
     @classmethod
-    def add_or_update_email(cls, nr_num, decision):
-        print('\n\n\nADD OR UPDATE EMAIL')
+    def add_or_update_email(cls, nr_num: str, decision: state):
         record = cls.query.filter_by(nr_num=nr_num).first()
         if record:
-            print('UPDATING AN EXISTING RECORD\n')
             record.decision = decision
         else:
-            print('CREATING A NEW RECORD\n')
             record = cls(nr_num=nr_num, decision=decision)
             db.session.add(record)
         db.session.commit()
     
     @classmethod
-    def hold_email(cls, nr_num, decision):
+    def hold_email(cls, nr_num: str):
         record = cls.query.filter_by(nr_num=nr_num).first()
         if record:
-            print('UPDATING AN EXISTING RECORD\n')
-            record.decision = decision
+            record.decision = state.HOLD
 
     @classmethod
-    def get_decision(cls, nr_num):
+    def get_decision(cls, nr_num: str):
         record = cls.query.filter_by(nr_num=nr_num).first()
         return record.decision if record else None
 
     @classmethod
-    def delete_record(cls, nr_num):
+    def delete_record(cls, nr_num: str):
         record = cls.query.filter_by(nr_num=nr_num).first()
         if record:
             db.session.delete(record)
